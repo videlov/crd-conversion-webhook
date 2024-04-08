@@ -6,7 +6,6 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 	k8s.io/apiextensions-apiserver v0.29.0
 	k8s.io/apimachinery v0.29.0
-	k8s.io/klog v0.4.0
 	k8s.io/klog/v2 v2.120.1
 )
 
