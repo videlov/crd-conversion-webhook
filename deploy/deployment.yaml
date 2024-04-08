@@ -1,31 +1,29 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: crd-conversion-webhook
-  namespace: crd-conversion-webhook
+  name: api-gateway-webhook-service
+  namespace: kyma-system
   labels:
-    name: crd-conversion-webhook
+    name: api-gateway-webhook-service
 spec:
   replicas: 1
   selector:
     matchLabels:
-      name: crd-conversion-webhook
+      name: api-gateway-webhook-service
   template:
     metadata:
       labels:
-        name: crd-conversion-webhook
+        name: api-gateway-webhook-service
+        sidecar.istio.io/inject: "false"
     spec:
       containers:
-       - name: crd-conversion-webhook
-         image: docker.io/videlov/crd-conversion-webhook
+       - name: api-gateway-webhook-service
+         image: docker.io/videlov/api-gateway-webhook-service:0.0.8
          command:
-         - /crd-conversion-webhook
-         args:
-           - -tls-cert-file=/etc/webhook/certs/cert.pem
-           - -tls-private-key-file=/etc/webhook/certs/key.pem
+         - /api-gateway-webhook-service
          ports:
-         - name: tls
-           containerPort: 443
+         - containerPort: 9443
+           protocol: TCP
          volumeMounts:
            - name: webhook-certs
              mountPath: /etc/webhook/certs
@@ -33,4 +31,17 @@ spec:
       volumes:
       - name: webhook-certs
         secret:
-          secretName: crd-conversion-webhook.crd-conversion-webhook.svc
+          secretName: api-gateway-webhook-service
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway-webhook-service
+  namespace: kyma-system
+spec:
+  ports:
+  - port: 9443
+    protocol: TCP
+  selector:
+     name: api-gateway-webhook-service
+  type: ClusterIP

@@ -195,9 +195,8 @@ func serve(w http.ResponseWriter, r *http.Request, convert convertFunc) {
 	}
 }
 
-// ServeExampleConvert servers endpoint for the example converter defined as convertExampleCRD function.
-func ServeExampleConvert(w http.ResponseWriter, r *http.Request) {
-	serve(w, r, convertExampleCRD)
+func ServeConvert(w http.ResponseWriter, r *http.Request) {
+	serve(w, r, convertCRD)
 }
 
 type mediaType struct {

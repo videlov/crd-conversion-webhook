@@ -14,76 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package crdconvwebhook
+package main
 
 import (
-	"crypto/tls"
 	"fmt"
 	"net/http"
 
-	"github.com/spf13/cobra"
 	"github.com/videlov/crd-conversion-webhook/converter"
-	"k8s.io/klog"
 )
 
-var (
-	certFile string
-	keyFile  string
-	port     int
-)
-
-// CmdCrdConversionWebhook is used by agnhost Cobra.
-var CmdCrdConversionWebhook = &cobra.Command{
-	Use:   "crd-conversion-webhook",
-	Short: "Starts HTTP server on port 443 for testing CustomResourceConversionWebhook",
-	Long: `The subcommand tests "CustomResourceConversionWebhook".
-
-After deploying it to Kubernetes cluster, the administrator needs to create a "CustomResourceConversion.Webhook" in Kubernetes cluster to use remote webhook for conversions.
-
-The subcommand starts a HTTP server, listening on port 443, and creating the "/crdconvert" endpoint.`,
-	Args: cobra.MaximumNArgs(0),
-	Run:  main,
-}
-
-func init() {
-	CmdCrdConversionWebhook.Flags().StringVar(&certFile, "tls-cert-file", "",
-		"File containing the default x509 Certificate for HTTPS. (CA cert, if any, concatenated "+
-			"after server cert.")
-	CmdCrdConversionWebhook.Flags().StringVar(&keyFile, "tls-private-key-file", "",
-		"File containing the default x509 private key matching --tls-cert-file.")
-	CmdCrdConversionWebhook.Flags().IntVar(&port, "port", 443,
-		"Secure port that the webhook listens on")
-}
-
-// Config contains the server (the webhook) cert and key.
-type Config struct {
-	CertFile string
-	KeyFile  string
-}
-
-func main(cmd *cobra.Command, args []string) {
-	config := Config{CertFile: certFile, KeyFile: keyFile}
-
-	http.HandleFunc("/crdconvert", converter.ServeExampleConvert)
+func main() {
+	http.HandleFunc("/crdconvert", converter.ServeConvert)
 	http.HandleFunc("/readyz", func(w http.ResponseWriter, req *http.Request) { w.Write([]byte("ok")) })
 	server := &http.Server{
-		Addr:      fmt.Sprintf(":%d", port),
-		TLSConfig: configTLS(config),
+		Addr: fmt.Sprintf(":%d", 9443),
 	}
-	err := server.ListenAndServeTLS("", "")
+	err := server.ListenAndServeTLS("/etc/webhook/certs/tls.crt", "/etc/webhook/certs/tls.key")
 	if err != nil {
 		panic(err)
-	}
-}
-
-func configTLS(config Config) *tls.Config {
-	sCert, err := tls.LoadX509KeyPair(config.CertFile, config.KeyFile)
-	if err != nil {
-		klog.Fatal(err)
-	}
-	return &tls.Config{
-		Certificates: []tls.Certificate{sCert},
-		// TODO: uses mutual tls after we agree on what cert the apiserver should use.
-		// ClientAuth:   tls.RequireAndVerifyClientCert,
 	}
 }

@@ -11,12 +11,12 @@ RUN go mod download
 COPY main.go main.go
 COPY converter/ converter/
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o crd-conversion-webhook main.go
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o api-gateway-webhook-service main.go
 
 FROM gcr.io/distroless/static:nonroot
 WORKDIR /
-COPY --from=builder /workspace/crd-conversion-webhook .
+COPY --from=builder /workspace/api-gateway-webhook-service .
 
 USER 65532:65532
 
-ENTRYPOINT ["/crd-conversion-webhook"]
+ENTRYPOINT ["/api-gateway-webhook-service"]
