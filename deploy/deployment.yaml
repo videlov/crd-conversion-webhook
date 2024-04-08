@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
        - name: api-gateway-webhook-service
-         image: docker.io/videlov/api-gateway-webhook-service:0.0.8
+         image: docker.io/videlov/api-gateway-webhook-service:0.0.17
          command:
          - /api-gateway-webhook-service
          ports:

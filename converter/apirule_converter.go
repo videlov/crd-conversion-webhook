@@ -38,8 +38,7 @@ func convertCRD(Object *unstructured.Unstructured, toVersion string) (*unstructu
 	case "gateway.kyma-project.io/v1beta1":
 		switch toVersion {
 		case "gateway.kyma-project.io/v1beta2":
-			fmt.Println("v1beta1->v1beta2")
-			fmt.Println(convertedObject)
+			fmt.Printf("%s/%s: converting v1beta1->v1beta2\n", convertedObject.GetNamespace(), convertedObject.GetName())
 			annotations := convertedObject.GetAnnotations()
 			annotations["gateway.kyma-project.io/converted-to-v1beta2"] = "true"
 			convertedObject.SetAnnotations(annotations)
@@ -58,26 +57,25 @@ func convertCRD(Object *unstructured.Unstructured, toVersion string) (*unstructu
 					return nil, statusErrorWithMessage("rule field is not an object")
 				}
 				accessStrategies := ruleMap["accessStrategies"]
-				if accessStrategies == nil {
-					return nil, statusErrorWithMessage("no access strategies found")
-				}
-				accessStrategiesSlice, ok := accessStrategies.([]interface{})
-				if !ok {
-					return nil, statusErrorWithMessage("accessStrategies field is not a slice")
-				}
-				for _, accessStrategy := range accessStrategiesSlice {
-					accessStrategyMap, ok := accessStrategy.(map[string]interface{})
+				if accessStrategies != nil {
+					accessStrategiesSlice, ok := accessStrategies.([]interface{})
 					if !ok {
-						return nil, statusErrorWithMessage("accessStrategy is not a map")
+						return nil, statusErrorWithMessage("accessStrategies field is not a slice")
 					}
-					if accessStrategyMap["handler"] == "no_auth" {
-						noAuth = true
+					for _, accessStrategy := range accessStrategiesSlice {
+						accessStrategyMap, ok := accessStrategy.(map[string]interface{})
+						if !ok {
+							return nil, statusErrorWithMessage("accessStrategy is not a map")
+						}
+						if accessStrategyMap["handler"] == "no_auth" {
+							noAuth = true
+						}
 					}
 				}
 				if noAuth {
-					delete(ruleMap, "accessStrategies")
 					ruleMap["noAuth"] = true
 				}
+				delete(ruleMap, "accessStrategies")
 			}
 		default:
 			return nil, statusErrorWithMessage("unexpected conversion version %q", toVersion)
@@ -85,10 +83,53 @@ func convertCRD(Object *unstructured.Unstructured, toVersion string) (*unstructu
 	case "gateway.kyma-project.io/v1beta2":
 		switch toVersion {
 		case "gateway.kyma-project.io/v1beta1":
-			fmt.Println("v1beta2->v1beta1")
+			fmt.Printf("%s/%s: converting v1beta2->v1beta1\n", convertedObject.GetNamespace(), convertedObject.GetName())
 			annotations := convertedObject.GetAnnotations()
 			annotations["gateway.kyma-project.io/converted-to-v1beta1"] = "true"
 			convertedObject.SetAnnotations(annotations)
+			rules, _, err := unstructured.NestedFieldNoCopy(convertedObject.Object, "spec", "rules")
+			if err != nil {
+				return nil, statusErrorWithMessage("failed to get rules field")
+			}
+			rulesSlice, ok := rules.([]interface{})
+			if !ok {
+				return nil, statusErrorWithMessage("rules field is not a slice")
+			}
+			for _, rule := range rulesSlice {
+				ruleMap, ok := rule.(map[string]interface{})
+				if !ok {
+					return nil, statusErrorWithMessage("rule field is not a map")
+				}
+				noAuth := ruleMap["noAuth"]
+				if noAuth != nil {
+					noAuthBool, ok := noAuth.(bool)
+					if !ok {
+						return nil, statusErrorWithMessage("noAuth field is not a boolean")
+					}
+					if noAuthBool {
+						ruleMap["accessStrategies"] = []interface{}{
+							map[string]interface{}{
+								"handler": "no_auth",
+							},
+						}
+					}
+					delete(ruleMap, "noAuth")
+				}
+				accessStrategy := ruleMap["accessStrategy"]
+				if accessStrategy != nil {
+					accessStrategyMap, ok := accessStrategy.(map[string]interface{})
+					if !ok {
+						return nil, statusErrorWithMessage("accessStrategy field is not a map")
+					}
+					if accessStrategyMap["extAuth"] != nil || accessStrategyMap["jwt"] != nil {
+						ruleMap["accessStrategies"] = []interface{}{
+							map[string]interface{}{
+								"handler": "allow",
+							},
+						}
+					}
+				}
+			}
 		default:
 			return nil, statusErrorWithMessage("unexpected conversion version %q", toVersion)
 		}
