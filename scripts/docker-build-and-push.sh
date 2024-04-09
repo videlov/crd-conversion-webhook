@@ -1,7 +1,8 @@
 #!/bin/bash
 
-IMG=videlov/api-gateway-webhook-service:0.0.17
+version="${VER:-0.0.1}"
+image="videlov/api-gateway-webhook-service:${version}"
 
-docker build -t ${IMG} .
+docker build -t ${image} .
 docker login
-docker push ${IMG}
+docker push ${image}

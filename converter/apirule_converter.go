@@ -51,13 +51,12 @@ func convertCRD(Object *unstructured.Unstructured, toVersion string) (*unstructu
 				return nil, statusErrorWithMessage("rules field is not a slice")
 			}
 			for _, rule := range rulesSlice {
-				noAuth := false
 				ruleMap, ok := rule.(map[string]interface{})
 				if !ok {
 					return nil, statusErrorWithMessage("rule field is not an object")
 				}
-				accessStrategies := ruleMap["accessStrategies"]
-				if accessStrategies != nil {
+				accessStrategies, ok := ruleMap["accessStrategies"]
+				if ok {
 					accessStrategiesSlice, ok := accessStrategies.([]interface{})
 					if !ok {
 						return nil, statusErrorWithMessage("accessStrategies field is not a slice")
@@ -65,17 +64,17 @@ func convertCRD(Object *unstructured.Unstructured, toVersion string) (*unstructu
 					for _, accessStrategy := range accessStrategiesSlice {
 						accessStrategyMap, ok := accessStrategy.(map[string]interface{})
 						if !ok {
-							return nil, statusErrorWithMessage("accessStrategy is not a map")
+							return nil, statusErrorWithMessage("accessStrategy is not an object")
 						}
 						if accessStrategyMap["handler"] == "no_auth" {
-							noAuth = true
+							ruleMap["noAuth"] = true
+						}
+						if accessStrategyMap["handler"] == "jwt" {
+							ruleMap["jwt"] = accessStrategyMap["config"]
 						}
 					}
+					delete(ruleMap, "accessStrategies")
 				}
-				if noAuth {
-					ruleMap["noAuth"] = true
-				}
-				delete(ruleMap, "accessStrategies")
 			}
 		default:
 			return nil, statusErrorWithMessage("unexpected conversion version %q", toVersion)
@@ -98,10 +97,10 @@ func convertCRD(Object *unstructured.Unstructured, toVersion string) (*unstructu
 			for _, rule := range rulesSlice {
 				ruleMap, ok := rule.(map[string]interface{})
 				if !ok {
-					return nil, statusErrorWithMessage("rule field is not a map")
+					return nil, statusErrorWithMessage("rule field is not an object")
 				}
-				noAuth := ruleMap["noAuth"]
-				if noAuth != nil {
+				noAuth, ok := ruleMap["noAuth"]
+				if ok {
 					noAuthBool, ok := noAuth.(bool)
 					if !ok {
 						return nil, statusErrorWithMessage("noAuth field is not a boolean")
@@ -113,21 +112,23 @@ func convertCRD(Object *unstructured.Unstructured, toVersion string) (*unstructu
 							},
 						}
 					}
-					delete(ruleMap, "noAuth")
 				}
-				accessStrategy := ruleMap["accessStrategy"]
-				if accessStrategy != nil {
-					accessStrategyMap, ok := accessStrategy.(map[string]interface{})
+				jwt, ok := ruleMap["jwt"]
+				if ok {
+					jwtMap, ok := jwt.(map[string]interface{})
 					if !ok {
-						return nil, statusErrorWithMessage("accessStrategy field is not a map")
+						return nil, statusErrorWithMessage("accessStrategy field is not an object")
 					}
-					if accessStrategyMap["extAuth"] != nil || accessStrategyMap["jwt"] != nil {
-						ruleMap["accessStrategies"] = []interface{}{
-							map[string]interface{}{
-								"handler": "allow",
-							},
-						}
+					ruleMap["accessStrategies"] = []interface{}{
+						map[string]interface{}{
+							"handler": "jwt",
+							"config":  jwtMap,
+						},
 					}
+				}
+				_, ok = ruleMap["extAuth"]
+				if ok {
+					ruleMap["extAuth"] = "converted"
 				}
 			}
 		default:
